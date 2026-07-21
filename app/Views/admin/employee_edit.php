@@ -52,7 +52,7 @@ $isNew = !$emp;
  <?php if ($isNew): ?>
  <div style="margin-top:12px">
  <label>Initial Password</label>
- <input class="input" type="password" name="password" minlength="8" required/>
+ <input class="input" type="password" name="password" minlength="12" autocomplete="new-password" required/>
  </div>
  <?php endif; ?>
 
@@ -78,7 +78,7 @@ $isNew = !$emp;
  <input class="input" name="confirm_email" placeholder="<?= e($emp['email']) ?>" required/>
  <div style="height:10px"></div>
  <label>New password</label>
- <input class="input" type="password" name="new_password" minlength="8" required/>
+ <input class="input" type="password" name="new_password" minlength="12" autocomplete="new-password" required/>
  <div style="margin-top:12px">
  <button class="btn danger" type="submit">Change Password</button>
  </div>

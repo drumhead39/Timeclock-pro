@@ -33,10 +33,25 @@ final class Auth {
 
   public static function login(string $email, string $password): bool {
     $u = User::findByEmail($email);
-    if (!$u || (int)$u['active'] !== 1) return false;
-    if (!password_verify($password, $u['password_hash'])) return false;
+    if (!$u || (int)$u['active'] !== 1 || !password_verify($password, $u['password_hash'])) {
+      return false;
+    }
+
+    session_regenerate_id(true);
     $_SESSION['user_id'] = (int)$u['id'];
+    unset($_SESSION['selected_pay_period_id']);
+    Csrf::rotate();
+
+    if (password_needs_rehash((string)$u['password_hash'], PASSWORD_DEFAULT)) {
+      User::setPassword((int)$u['id'], password_hash($password, PASSWORD_DEFAULT));
+    }
+
     return true;
+  }
+
+  public static function homePath(): string {
+    $u = self::user();
+    return $u && $u['role'] === 'super' ? '/timecards' : '/timecard';
   }
 
   public static function logout(): void {

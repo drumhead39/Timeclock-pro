@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Csrf;
+use App\Core\Auth;
 
 final class DebugController {
   public static function clientError(): void {
@@ -13,10 +14,12 @@ final class DebugController {
       return;
     }
 
+    Auth::requireLogin();
+
     $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
     Csrf::check(is_string($token) ? $token : null);
 
-    $raw = file_get_contents('php://input') ?: '';
+    $raw = file_get_contents('php://input', false, null, 0, 32768) ?: '';
     $data = json_decode($raw, true);
     if (!is_array($data)) $data = ['raw' => $raw];
 

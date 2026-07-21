@@ -12,6 +12,12 @@ final class Csrf {
     return $_SESSION['_csrf'];
   }
 
+  public static function rotate(): string {
+    if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+    $_SESSION['_csrf'] = bin2hex(random_bytes(32));
+    return $_SESSION['_csrf'];
+  }
+
   public static function check(?string $token): void {
     if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
     $ok = isset($_SESSION['_csrf']) && is_string($token) && hash_equals($_SESSION['_csrf'], $token);

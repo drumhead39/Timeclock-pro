@@ -12,10 +12,7 @@ $user = Auth::user();
  <meta name="viewport" content="width=device-width, initial-scale=1"/>
  <title><?= e($title ?? 'TimeClock') ?></title>
  <link rel="stylesheet" href="<?= e(url('/assets/css/app.css') . '?v=20260427-2') ?>"/>
- <link rel="icon" href="<?= e(url('/favicon.ico')) ?>" sizes="any">
- <link rel="icon" type="image/png" href="<?= e(url('/favicon-32x32.png')) ?>" sizes="32x32">
- <link rel="icon" type="image/png" href="<?= e(url('/favicon-16x16.png')) ?>" sizes="16x16">
- <link rel="apple-touch-icon" href="<?= e(url('/apple-touch-icon.png')) ?>">
+ <link rel="icon" type="image/svg+xml" href="<?= e(url('/icon.svg')) ?>">
  <link rel="manifest" href="<?= e(url('/site.webmanifest')) ?>">
 </head>
 <body>
@@ -24,8 +21,8 @@ $user = Auth::user();
    <div class="brand">TimeClock</div>
    <div class="nav">
     <?php if ($user): ?>
-      <a href="<?= e(url('/timecards')) ?>">Time Cards</a>
       <?php if ($user['role']==='super'): ?>
+        <a href="<?= e(url('/timecards')) ?>">Time Cards</a>
         <details class="nav-dropdown">
           <summary class="nav-dropbtn">Admin ▾</summary>
           <div class="nav-dropdown-menu">
@@ -35,8 +32,13 @@ $user = Auth::user();
             <a href="<?= e(url('/admin/settings')) ?>">Settings</a>
           </div>
         </details>
+      <?php else: ?>
+        <a href="<?= e(url('/timecard')) ?>">My Timecard</a>
       <?php endif; ?>
-      <a href="<?= e(url('/logout')) ?>">Logout</a>
+      <form class="nav-form" method="post" action="<?= e(url('/logout')) ?>">
+        <input type="hidden" name="_csrf" value="<?= e(\App\Core\Csrf::token()) ?>"/>
+        <button class="nav-link-button" type="submit">Logout</button>
+      </form>
     <?php else: ?>
       <a href="<?= e(url('/login')) ?>">Login</a>
     <?php endif; ?>

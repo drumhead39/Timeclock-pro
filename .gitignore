@@ -14,6 +14,8 @@
 !/storage/reports/.gitkeep
 /storage/sessions/*
 !/storage/sessions/.gitkeep
+/storage/rate-limits/*
+!/storage/rate-limits/.gitkeep
 
 # Public diagnostic files and server logs
 /public/boot-test.php
@@ -27,4 +29,3 @@
 Thumbs.db
 .idea/
 .vscode/
-

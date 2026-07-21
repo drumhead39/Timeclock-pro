@@ -16,11 +16,11 @@ $router = new Router();
 // Auth
 $router->get('/login', fn() => AuthController::showLogin());
 $router->post('/login', fn() => AuthController::login());
-$router->get('/logout', fn() => AuthController::logout());
+$router->post('/logout', fn() => AuthController::logout());
 
 // Home redirect
-$router->get('/', fn() => \redirect('/timecards'));
-$router->get('/home', fn() => EmployeeController::home());
+$router->get('/', fn() => AuthController::home());
+$router->get('/home', fn() => AuthController::home());
 $router->get('/timecards', fn() => AdminController::timecards());
 // Employee
 $router->get('/dashboard', fn() => EmployeeController::dashboard());

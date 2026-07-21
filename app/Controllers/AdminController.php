@@ -73,7 +73,15 @@ final class AdminController {
     $ptoBankHrs = (float)($_POST['pto_bank_hours'] ?? 0);
     $ptoBankMin = (int)round(max(0, $ptoBankHrs) * 60);
 
-    if ($full === '' || $email === '') { flash_set('error','Name and email required.'); redirect($id?"/admin/employees/$id":"\/admin/employees/new"); }
+    if ($full === '' || strlen($full) > 190 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
+      flash_set('error','Enter a valid name and email address.');
+      redirect($id?"/admin/employees/$id":"/admin/employees/new");
+    }
+    $existing = User::findByEmail($email);
+    if ($existing && (int)$existing['id'] !== $id) {
+      flash_set('error','That email address is already in use.');
+      redirect($id?"/admin/employees/$id":"/admin/employees/new");
+    }
 
     if ($id) {
       User::update($id, [
@@ -81,7 +89,7 @@ final class AdminController {
       ]);
     } else {
       $pw = (string)($_POST['password'] ?? '');
-      if (strlen($pw) < 8) { flash_set('error','Password must be at least 8 characters.'); redirect('/admin/employees/new'); }
+      if (strlen($pw) < 12 || strlen($pw) > 4096) { flash_set('error','Password must be between 12 and 4,096 characters.'); redirect('/admin/employees/new'); }
       $hash = password_hash($pw, PASSWORD_DEFAULT);
       User::create([
         'full_name'=>$full,'email'=>$email,'role'=>$role,'active'=>$active,'weight_loss_consultant'=>$wlc,'nursing_encounters_enabled'=>$nec,'pto_bank_minutes'=>$ptoBankMin,'password_hash'=>$hash
@@ -113,7 +121,7 @@ final class AdminController {
     }
 
     $newPw = (string)($_POST['new_password'] ?? '');
-    if (strlen($newPw) < 8) { flash_set('error','New password must be at least 8 characters.'); redirect('/admin/employees/' . $empId); }
+    if (strlen($newPw) < 12 || strlen($newPw) > 4096) { flash_set('error','New password must be between 12 and 4,096 characters.'); redirect('/admin/employees/' . $empId); }
 
     User::setPassword($empId, password_hash($newPw, PASSWORD_DEFAULT));
     flash_set('ok','Password updated.');
@@ -153,7 +161,7 @@ final class AdminController {
   }
 
   public static function timecards(): void {
-    Auth::requireLogin();
+    Auth::requireRole('super');
     $u = Auth::user();
     $pp = self::getPayPeriodFromRequest();
     $employeeStatus = Timecard::statusForPayPeriod((int)$pp['id']);
@@ -205,8 +213,8 @@ final class AdminController {
       }
       $d = $d->modify('+1 day');
     }
-    $year = (int)(new \DateTimeImmutable('today'))->format('Y');
-    $usedYtd = Timecard::sumPtoUsedYtd((int)$emp['id'], $year);
+    $year = (int)substr((string)$pp['start_date'], 0, 4);
+    $usedYtd = Timecard::sumPtoUsedYtdThroughDate((int)$emp['id'], $year, (string)$pp['end_date']);
     $bank = (int)$emp['pto_bank_minutes'];
     $avail = max(0, $bank - $usedYtd);
 
@@ -234,6 +242,8 @@ final class AdminController {
 
     $pp = PayPeriod::findById($ppId);
     if (!$pp) { http_response_code(400); echo "Invalid pay period."; return; }
+    $emp = User::findById($empId);
+    if (!$emp) { http_response_code(404); echo "Employee not found."; return; }
 
     $tc = Timecard::ensure($empId, $ppId);
     if (!empty($tc['locked_at'])) { flash_set('error','Timecard is locked.'); redirect('/admin/timecards/' . $empId . '?pp=' . $ppId); }
@@ -241,41 +251,46 @@ final class AdminController {
     $sv = Settings::settingsVersion((int)$pp['settings_version_id']);
     $cfg = $sv['config'];
 
-    $rows = $_POST['rows'] ?? [];
+    try {
+      $rows = TimeService::normalizeRows((array)($_POST['rows'] ?? []), $pp, $cfg);
+    } catch (\InvalidArgumentException $e) {
+      flash_set('error', $e->getMessage());
+      redirect('/admin/timecards/' . $empId . '?pp=' . $ppId);
+    }
+
     foreach ($rows as $workDate => $vals) {
-      $tin = trim((string)($vals['in'] ?? ''));
-      $tout = trim((string)($vals['out'] ?? ''));
-
-      $tin = $tin !== '' ? TimeService::roundTime($tin, $cfg) : null;
-      $tout = $tout !== '' ? TimeService::roundTime($tout, $cfg) : null;
-
-      if ($tin === null && $tout === null) {
+      if ($vals['in'] === null && $vals['out'] === null) {
         TimeEntry::deleteForDate($empId, $ppId, $workDate);
       } else {
-        TimeEntry::upsert($empId, $ppId, $workDate, $tin, $tout);
+        TimeEntry::upsert($empId, $ppId, $workDate, $vals['in'], $vals['out']);
       }
     }
 
     $ptoHrs = trim((string)($_POST['pto_hours'] ?? ''));
     $ptoMin = 0;
     if ($ptoHrs !== '') {
-      $ptoMin = (int)round(((float)$ptoHrs) * 60);
+      $ptoValue = (float)$ptoHrs;
+      if (!is_finite($ptoValue) || $ptoValue < 0) { flash_set('error','Enter a valid PTO amount.'); redirect('/admin/timecards/' . $empId . '?pp=' . $ppId); }
+      $ptoMin = (int)round($ptoValue * 60);
       $inc = (int)($cfg['time_increment_minutes'] ?? 15);
       if ($inc > 0) $ptoMin = (int)round($ptoMin / $inc) * $inc;
       $ptoMin = max(0, $ptoMin);
     }
+    $ptoYear = (int)substr((string)$pp['start_date'], 0, 4);
+    $usedYtd = Timecard::sumPtoUsedYtdThroughDate($empId, $ptoYear, (string)$pp['end_date']);
+    $usedExcludingCurrent = max(0, $usedYtd - (int)($tc['pto_minutes'] ?? 0));
+    $ptoMin = min($ptoMin, max(0, (int)$emp['pto_bank_minutes'] - $usedExcludingCurrent));
 
 
 $wlUnits = 0;
 $nursingEncounters = 0;
-$emp = User::findById($empId);
 if ($emp && !empty($emp['weight_loss_consultant'])) {
   $wlUnits = (int)($_POST['weight_loss_units'] ?? 0);
-  if ($wlUnits < 0) $wlUnits = 0;
+  $wlUnits = max(0, min(1000000, $wlUnits));
 }
 if ($emp && !empty($emp['nursing_encounters_enabled'])) {
   $nursingEncounters = (int)($_POST['nursing_encounters'] ?? 0);
-  if ($nursingEncounters < 0) $nursingEncounters = 0;
+  $nursingEncounters = max(0, min(1000000, $nursingEncounters));
 }
     Timecard::update($empId, $ppId, ['pto_minutes' => $ptoMin, 'weight_loss_units' => $wlUnits, 'nursing_encounters' => $nursingEncounters]);
 
@@ -289,6 +304,10 @@ if ($emp && !empty($emp['nursing_encounters_enabled'])) {
     $empId = (int)($_POST['emp_id'] ?? 0);
     $ppId = (int)($_POST['pay_period_id'] ?? 0);
     $_SESSION['selected_pay_period_id'] = $ppId;
+    if (!User::findById($empId) || !PayPeriod::findById($ppId)) {
+      flash_set('error','Invalid employee or pay period.');
+      redirect('/timecards');
+    }
     // When an admin locks a card, treat it as "final" for the period.
     Timecard::ensure($empId, $ppId);
     Timecard::markSubmittedIfNull($empId, $ppId);
@@ -303,6 +322,10 @@ if ($emp && !empty($emp['nursing_encounters_enabled'])) {
     $empId = (int)($_POST['emp_id'] ?? 0);
     $ppId = (int)($_POST['pay_period_id'] ?? 0);
     $_SESSION['selected_pay_period_id'] = $ppId;
+    if (!User::findById($empId) || !PayPeriod::findById($ppId)) {
+      flash_set('error','Invalid employee or pay period.');
+      redirect('/timecards');
+    }
     Timecard::setUnlocked($empId, $ppId);
     flash_set('ok','Unlocked.');
     redirect('/admin/timecards/' . $empId . '?pp=' . $ppId);

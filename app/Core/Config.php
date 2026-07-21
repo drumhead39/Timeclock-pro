@@ -8,7 +8,7 @@ final class Config {
 
   public static function load(string $path): void {
     if (!file_exists($path)) {
-      throw new \RuntimeException("Missing config.php. Copy app/config.sample.php to app/config.php and edit it, or run /install.");
+      throw new \RuntimeException("Missing config.php. Copy app/config.sample.php to app/config.php and edit it.");
     }
     self::$cfg = require $path;
   }

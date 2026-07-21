@@ -7,6 +7,12 @@ use App\Core\DB;
 
 final class ProviderRate {
 
+  public static function belongsToProvider(int $id, int $providerId): bool {
+    $st = DB::pdo()->prepare("SELECT 1 FROM provider_rates WHERE id=? AND provider_id=? LIMIT 1");
+    $st->execute([$id, $providerId]);
+    return (bool)$st->fetchColumn();
+  }
+
   public static function effectiveRate(int $providerId, int $appointmentTypeId, string $asOfYmd): ?float {
     $sql = "SELECT rate FROM provider_rates
       WHERE provider_id=? AND appointment_type_id=?

@@ -145,6 +145,9 @@ select option{
 /* Primary navigation dropdown */
 .nav{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
 .nav a{margin-left:0}
+.nav-form{display:inline; margin:0}
+.nav-link-button{font:inherit; font-weight:600; color:var(--accent); border:0; background:transparent; padding:0; cursor:pointer}
+.nav-link-button:hover{text-decoration:underline}
 .nav-dropdown{position:relative; display:inline-flex}
 .nav-dropbtn{font:inherit; font-weight:700; color:var(--accent); border:0; background:transparent; cursor:pointer; padding:0}
 .nav-dropdown-menu{
