@@ -1,4 +1,4 @@
-name: PHP syntax check
+name: PHP checks
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -21,4 +21,17 @@ jobs:
 
       - name: Check PHP syntax
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Run regression tests
+        run: php tests/TimeServiceTest.php
+
+      - name: Check repository hygiene
+        shell: bash
+        run: |
+          forbidden="$(git ls-files | grep -E '^(app/config\.php|public/(boot-test|diag|phpver)\.php|public/error_log|storage/DEBUG_ON|storage/.*\.(log|pdf)|storage/sessions/sess_)' || true)"
+          if [ -n "$forbidden" ]; then
+            echo "Production-only files were committed:"
+            echo "$forbidden"
+            exit 1
+          fi
 

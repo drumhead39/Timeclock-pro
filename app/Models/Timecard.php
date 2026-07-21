@@ -74,4 +74,16 @@ final class Timecard {
     $st->execute([$userId, $year]);
     return (int)($st->fetch()['m'] ?? 0);
   }
+
+  public static function sumPtoUsedYtdThroughDate(int $userId, int $year, string $throughEndDate): int {
+    $sql = "SELECT COALESCE(SUM(tc.pto_minutes),0) as m
+      FROM timecards tc
+      JOIN pay_periods pp ON pp.id=tc.pay_period_id
+      WHERE tc.user_id=?
+        AND YEAR(pp.start_date)=?
+        AND pp.end_date <= ?";
+    $st = DB::pdo()->prepare($sql);
+    $st->execute([$userId, $year, $throughEndDate]);
+    return (int)($st->fetch()['m'] ?? 0);
+  }
 }

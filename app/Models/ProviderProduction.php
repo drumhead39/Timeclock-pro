@@ -46,7 +46,7 @@ final class ProviderProduction {
   public static function saveCounts(int $providerId, int $payPeriodId, array $counts): void {
     foreach ($counts as $appointmentTypeId => $count) {
       $c = (int)$count;
-      if ($c < 0) $c = 0;
+      $c = max(0, min(1000000, $c));
       DB::pdo()->prepare("UPDATE provider_production SET count=?, updated_at=NOW()
         WHERE provider_id=? AND pay_period_id=? AND appointment_type_id=?")
         ->execute([$c, $providerId, $payPeriodId, (int)$appointmentTypeId]);

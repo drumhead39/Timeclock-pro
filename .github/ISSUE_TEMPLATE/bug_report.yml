@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem without including private employee or server data.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include credentials, employee information, production reports, or unsanitized logs. Report vulnerabilities through the Security tab."
+  - type: input
+    id: version
+    attributes:
+      label: TimeClock Pro version
+      placeholder: "For example: 1.0.0 or a commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include PHP, database, web-server, and browser versions.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest sanitized sequence that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed credentials, employee information, reports, and other production data.
+          required: true
+

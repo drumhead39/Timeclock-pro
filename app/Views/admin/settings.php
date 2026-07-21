@@ -52,7 +52,7 @@ $dayNames = [1=>'Mon',2=>'Tue',3=>'Wed',4=>'Thu',5=>'Fri',6=>'Sat',7=>'Sun'];
  </label>
  <?php endfor; ?>
  </div>
- <small class="mono">Your current sheet uses Monday–Saturday. </small>
+ <small class="mono">Choose the days that should appear on each timecard.</small>
  </div>
  </div>
  </div>

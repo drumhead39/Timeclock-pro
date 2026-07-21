@@ -17,6 +17,11 @@ use App\Models\ProviderPto;
 
 final class ProviderController {
 
+  private static function validDate(string $value): bool {
+    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date instanceof \DateTimeImmutable && $date->format('Y-m-d') === $value;
+  }
+
   
   private static function getPayPeriodFromRequest(): array {
     return \selected_pay_period((int)($_GET["pp"] ?? 0));
@@ -81,7 +86,7 @@ final class ProviderController {
       $ptoBankMin = (int)round($h * 60);
     }
 
-    if ($name === '') {
+    if ($name === '' || strlen($name) > 190) {
       flash_set('error','Provider name is required.');
       redirect('/admin/providers');
     }
@@ -133,7 +138,7 @@ final class ProviderController {
       $ptoBankMin = (int)round($h * 60);
     }
 
-    if ($name === '') {
+    if ($name === '' || strlen($name) > 190) {
       flash_set('error','Type name is required.');
       redirect('/admin/appointment-types');
     }
@@ -211,7 +216,19 @@ public static function appointmentTypeDelete(): void {
     $effTo = trim((string)($_POST['effective_to'] ?? ''));
     $effTo = $effTo !== '' ? $effTo : null;
 
-    if ($typeId <= 0) { flash_set('error','Select an appointment type.'); redirect('/admin/providers/' . $providerId . '/rates'); }
+    $type = AppointmentType::findById($typeId);
+    if (!$type || (string)$type['provider_type'] !== (string)$prov['provider_type']) {
+      flash_set('error','Select an appointment type for this provider.');
+      redirect('/admin/providers/' . $providerId . '/rates');
+    }
+    if (!is_finite($rate) || $rate < 0 || $rate > 1000000) {
+      flash_set('error','Enter a valid rate.');
+      redirect('/admin/providers/' . $providerId . '/rates');
+    }
+    if (!self::validDate($effFrom) || ($effTo !== null && (!self::validDate($effTo) || $effTo < $effFrom))) {
+      flash_set('error','Enter a valid effective date range.');
+      redirect('/admin/providers/' . $providerId . '/rates');
+    }
 
     ProviderRate::addRate($providerId, $typeId, $rate, $effFrom, $effTo);
     flash_set('ok','Rate added (previous open rate auto-closed).');
@@ -225,6 +242,10 @@ public static function appointmentTypeDelete(): void {
     $rateId = (int)($_POST['rate_id'] ?? 0);
     $effTo = trim((string)($_POST['effective_to'] ?? ''));
     $effTo = $effTo !== '' ? $effTo : null;
+    if (!ProviderRate::belongsToProvider($rateId, $providerId) || ($effTo !== null && !self::validDate($effTo))) {
+      flash_set('error','Invalid rate or end date.');
+      redirect('/admin/providers/' . $providerId . '/rates');
+    }
     ProviderRate::setEffectiveTo($rateId, $effTo);
     flash_set('ok','Rate updated.');
     redirect('/admin/providers/' . $providerId . '/rates');
@@ -239,12 +260,15 @@ public static function providerRateUpdate(array $params): void {
   $rateId = (int)($_POST['rate_id'] ?? 0);
   $rate = (float)($_POST['rate'] ?? 0);
 
-  if ($providerId <= 0 || $rateId <= 0) {
+  if ($providerId <= 0 || $rateId <= 0 || !ProviderRate::belongsToProvider($rateId, $providerId)) {
     flash_set('error','Invalid rate.');
     redirect('/admin/providers/' . $providerId . '/rates');
   }
 
-  if ($rate < 0) $rate = 0;
+  if (!is_finite($rate) || $rate < 0 || $rate > 1000000) {
+    flash_set('error','Enter a valid rate.');
+    redirect('/admin/providers/' . $providerId . '/rates');
+  }
   ProviderRate::updateRate($rateId, $rate);
 
   flash_set('ok','Rate updated.');
@@ -258,7 +282,7 @@ public static function providerRateDelete(array $params): void {
   $providerId = (int)($params['id'] ?? 0);
   $rateId = (int)($_POST['rate_id'] ?? 0);
 
-  if ($providerId <= 0 || $rateId <= 0) {
+  if ($providerId <= 0 || $rateId <= 0 || !ProviderRate::belongsToProvider($rateId, $providerId)) {
     flash_set('error','Invalid rate.');
     redirect('/admin/providers/' . $providerId . '/rates');
   }

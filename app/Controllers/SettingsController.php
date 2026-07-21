@@ -50,7 +50,8 @@ final class SettingsController {
     $current = Settings::currentSettingsVersion();
     $cfg = $current['config'];
 
-    $inc = max(1, (int)($_POST['time_increment_minutes'] ?? ($cfg['time_increment_minutes'] ?? 15)));
+    $inc = (int)($_POST['time_increment_minutes'] ?? ($cfg['time_increment_minutes'] ?? 15));
+    if (!in_array($inc, [5,10,15,20,30], true)) $inc = 15;
     $mode = in_array($_POST['rounding_mode'] ?? '', ['nearest','down','up'], true) ? $_POST['rounding_mode'] : ($cfg['rounding_mode'] ?? 'nearest');
 
     $daysToShow = $_POST['days_to_show'] ?? [];
@@ -71,7 +72,21 @@ final class SettingsController {
     $companyName = trim((string)($_POST['company_name'] ?? $state['company_name']));
     $companyEmail = trim((string)($_POST['company_email'] ?? $state['company_email']));
     $anchor = trim((string)($_POST['pay_period_anchor_date'] ?? $state['pay_period_anchor_date']));
-    $length = max(7, (int)($_POST['pay_period_length_days'] ?? $state['pay_period_length_days']));
+    $length = max(7, min(31, (int)($_POST['pay_period_length_days'] ?? $state['pay_period_length_days'])));
+
+    $anchorDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $anchor);
+    if ($companyName === '' || strlen($companyName) > 190) {
+      flash_set('error', 'Company name is required and must be 190 characters or fewer.');
+      redirect('/admin/settings');
+    }
+    if ($companyEmail !== '' && (!filter_var($companyEmail, FILTER_VALIDATE_EMAIL) || strlen($companyEmail) > 190)) {
+      flash_set('error', 'Enter a valid report email address.');
+      redirect('/admin/settings');
+    }
+    if (!$anchorDate || $anchorDate->format('Y-m-d') !== $anchor) {
+      flash_set('error', 'Enter a valid pay-period anchor date.');
+      redirect('/admin/settings');
+    }
 
     $scope = ($_POST['apply_scope'] ?? 'next') === 'immediate' ? 'immediate' : 'next';
     $reround = isset($_POST['reround_existing']) && $scope === 'immediate';

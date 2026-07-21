@@ -20,12 +20,12 @@ final class EmployeeController {
 
   public static function home(): void {
     Auth::requireLogin();
-    redirect('/timecards');
+    redirect('/timecard');
   }
 
   public static function dashboard(): void {
     Auth::requireLogin();
-    redirect('/timecards');
+    redirect('/timecard');
   }
 
   public static function timecard(): void {
@@ -59,8 +59,8 @@ final class EmployeeController {
       $d = $d->modify('+1 day');
     }
 
-    $year = (int)(new \DateTimeImmutable('today'))->format('Y');
-    $usedYtd = Timecard::sumPtoUsedYtd((int)$u['id'], $year);
+    $year = (int)substr((string)$pp['start_date'], 0, 4);
+    $usedYtd = Timecard::sumPtoUsedYtdThroughDate((int)$u['id'], $year, (string)$pp['end_date']);
     $bank = (int)$u['pto_bank_minutes'];
     $avail = max(0, $bank - $usedYtd);
     $periods = \recent_pay_periods_with_selected($pp, 8);
@@ -87,6 +87,7 @@ final class EmployeeController {
     $ppId = (int)($_POST['pay_period_id'] ?? 0);
     $pp = PayPeriod::findById($ppId);
     if (!$pp) { http_response_code(400); echo "Invalid pay period."; return; }
+    if (!empty($pp['locked_at'])) { flash_set('error','This pay period is locked.'); redirect('/timecard?pp=' . $ppId); }
     $_SESSION['selected_pay_period_id'] = $ppId;
 
     $tc = Timecard::ensure((int)$u['id'], (int)$ppId);
@@ -95,18 +96,18 @@ final class EmployeeController {
     $sv = Settings::settingsVersion((int)$pp['settings_version_id']);
     $cfg = $sv['config'];
 
-    $rows = $_POST['rows'] ?? [];
+    try {
+      $rows = TimeService::normalizeRows((array)($_POST['rows'] ?? []), $pp, $cfg);
+    } catch (\InvalidArgumentException $e) {
+      flash_set('error', $e->getMessage());
+      redirect('/timecard?pp=' . $ppId);
+    }
+
     foreach ($rows as $workDate => $vals) {
-      $tin = trim((string)($vals['in'] ?? ''));
-      $tout = trim((string)($vals['out'] ?? ''));
-
-      $tin = $tin !== '' ? TimeService::roundTime($tin, $cfg) : null;
-      $tout = $tout !== '' ? TimeService::roundTime($tout, $cfg) : null;
-
-      if ($tin === null && $tout === null) {
+      if ($vals['in'] === null && $vals['out'] === null) {
         TimeEntry::deleteForDate((int)$u['id'], (int)$ppId, $workDate);
       } else {
-        TimeEntry::upsert((int)$u['id'], (int)$ppId, $workDate, $tin, $tout);
+        TimeEntry::upsert((int)$u['id'], (int)$ppId, $workDate, $vals['in'], $vals['out']);
       }
     }
 
@@ -114,22 +115,27 @@ final class EmployeeController {
     $ptoMin = 0;
     if ($ptoHrs !== '') {
       $f = (float)$ptoHrs;
+      if (!is_finite($f) || $f < 0) { flash_set('error','Enter a valid PTO amount.'); redirect('/timecard?pp=' . $ppId); }
       $ptoMin = (int)round($f * 60);
       $inc = (int)($cfg['time_increment_minutes'] ?? 15);
       if ($inc > 0) $ptoMin = (int)round($ptoMin / $inc) * $inc;
       $ptoMin = max(0, $ptoMin);
     }
+    $ptoYear = (int)substr((string)$pp['start_date'], 0, 4);
+    $usedYtd = Timecard::sumPtoUsedYtdThroughDate((int)$u['id'], $ptoYear, (string)$pp['end_date']);
+    $usedExcludingCurrent = max(0, $usedYtd - (int)($tc['pto_minutes'] ?? 0));
+    $ptoMin = min($ptoMin, max(0, (int)$u['pto_bank_minutes'] - $usedExcludingCurrent));
 
     $wlUnits = 0;
     if (!empty($u['weight_loss_consultant'])) {
       $wlUnits = (int)($_POST['weight_loss_units'] ?? 0);
-      if ($wlUnits < 0) $wlUnits = 0;
+      $wlUnits = max(0, min(1000000, $wlUnits));
     }
 
     $nursingEncounters = 0;
     if (!empty($u['nursing_encounters_enabled'])) {
       $nursingEncounters = (int)($_POST['nursing_encounters'] ?? 0);
-      if ($nursingEncounters < 0) $nursingEncounters = 0;
+      $nursingEncounters = max(0, min(1000000, $nursingEncounters));
     }
 
     Timecard::update((int)$u['id'], (int)$ppId, ['pto_minutes' => $ptoMin, 'weight_loss_units' => $wlUnits, 'nursing_encounters' => $nursingEncounters]);
@@ -144,6 +150,9 @@ final class EmployeeController {
     Csrf::check($_POST['_csrf'] ?? null);
 
     $ppId = (int)($_POST['pay_period_id'] ?? 0);
+    $pp = PayPeriod::findById($ppId);
+    if (!$pp) { http_response_code(400); echo "Invalid pay period."; return; }
+    if (!empty($pp['locked_at'])) { flash_set('error','This pay period is locked.'); redirect('/timecard?pp=' . $ppId); }
     $_SESSION['selected_pay_period_id'] = $ppId;
     $tc = Timecard::ensure((int)$u['id'], $ppId);
     if (!empty($tc['locked_at'])) { flash_set('error','Timecard is locked.'); redirect('/timecard?pp=' . $ppId); }

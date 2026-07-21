@@ -1,137 +1,144 @@
 # TimeClock Pro
 
-TimeClock Pro is a lightweight PHP and MySQL application for biweekly employee timecards on shared hosting.
+[![PHP syntax check](https://github.com/drumhead39/Timeclock-pro/actions/workflows/php-syntax.yml/badge.svg)](https://github.com/drumhead39/Timeclock-pro/actions/workflows/php-syntax.yml)
 
-> This application handles employee and payroll-related information. Keep the GitHub repository private and never commit production credentials, session files, logs, database exports, or generated timecard PDFs.
+TimeClock Pro is a self-hosted PHP and MySQL application for biweekly employee timecards, PTO tracking, pay-period approvals, payroll PDF reports, and optional provider-production reporting. It is designed for small clinics and service businesses using Apache-based shared hosting.
 
 ## Features
 
 ### Employees
 
-- Email and password login
-- Mobile-friendly timecard for the current pay period
-- Configurable time increments and rounding
-- PTO balance, usage, and availability
-- Final submission with confirmation
-- Optional per-pay-period production and encounter tracking
+- Secure email and password authentication
+- Mobile-friendly time entry
+- Configurable increments and rounding
+- PTO balance and usage display
+- Final submission with locking controls
+- Optional per-pay-period sales or encounter counters
 
 ### Administrators
 
 - Employee and provider management
-- Timecard review, editing, submission, and locking
-- Versioned timecard and rounding preferences
-- Pay-period controls
+- Timecard review, correction, submission, and locking
+- Versioned timecard preferences
+- Provider rates and production totals
 - PDF payroll report generation and email delivery
-- Provider production and rate reporting
+- Pay-period selection and historical reporting
+
+## Security and privacy
+
+TimeClock Pro handles employee and payroll-related information. Production credentials, sessions, logs, database exports, and generated reports must never be committed to Git.
+
+The repository includes protection for these files, but administrators remain responsible for HTTPS, server permissions, backups, access controls, and applicable privacy or employment-law requirements. Review [SECURITY.md](SECURITY.md) before deployment.
 
 ## Requirements
 
 - PHP 8.0 or newer; PHP 8.1 or newer is recommended
-- MySQL or MariaDB
-- Apache with `mod_rewrite`, or equivalent rewrite support
+- MySQL 5.7+ or MariaDB 10.3+
+- Apache with `mod_rewrite`, or an equivalent web-server configuration
 - HTTPS
-- PHP write access to `storage/logs/`, `storage/reports/`, and `storage/sessions/`
-
-## Repository safety
-
-The included `.gitignore` intentionally excludes:
-
-- `app/config.php`
-- Debug flags and temporary diagnostic scripts
-- PHP and application logs
-- Session files
-- Generated payroll PDFs
-- Environment files and database credentials
-
-Use `app/config.sample.php` as the template for each installation. Do not rename or remove the sample file from the repository.
+- PHP `PDO` and `pdo_mysql`
+- PHP write access to the required `storage/` subdirectories
 
 ## Installation
 
-### 1. Choose the web root
+### 1. Download the source
 
-Recommended: upload the project outside `public_html` and point the domain or subdomain document root to the project's `public/` directory.
+Clone the repository or download a release archive. Place the project outside the public web root whenever the hosting provider permits it.
 
-For a subfolder installation on shared hosting, upload the entire project to a folder such as `public_html/timeclock-pro/` and access the application through its `public/` subdirectory. Keep the root `.htaccess` file in place so private folders cannot be served directly.
+```bash
+git clone https://github.com/drumhead39/Timeclock-pro.git
+cd Timeclock-pro
+```
 
 ### 2. Create the database
 
-Create a MySQL database and database user, grant the user the required privileges, and import:
+Create an empty MySQL or MariaDB database and database user. Grant that user the required privileges, then import:
 
 ```text
 database/schema.sql
 ```
 
-For an existing installation, apply only the migration files that have not already been run.
+The fresh-install schema creates the complete table structure and default application settings. It does not create a default administrator.
 
-### 3. Create the local configuration
+### 3. Configure the application
 
-On the server, copy:
+Copy the sample configuration on the server:
 
-```text
-app/config.sample.php
+```bash
+cp app/config.sample.php app/config.php
 ```
 
-to:
-
-```text
-app/config.php
-```
-
-Then update the database name, username, password, base URL, timezone, and debug setting in `app/config.php`. This file is ignored by Git and must remain server-only.
+Edit `app/config.php` and supply the database name, username, password, base URL, and timezone. Keep debug mode disabled in production. The real configuration file is ignored by Git.
 
 ### 4. Create the first administrator
 
-The initial database schema does not create a default administrator. Generate a password hash with PHP:
+From the project directory, run:
 
 ```bash
-php -r "echo password_hash('REPLACE_WITH_A_STRONG_PASSWORD', PASSWORD_DEFAULT), PHP_EOL;"
+php bin/create-admin.php "Administrator Name" admin@example.com
 ```
 
-Insert the first user into the `users` table with the generated hash and the role `super`. After login, additional employees can be created through the administrator area.
+The command will request a password containing at least 12 characters. To avoid an interactive prompt, the password may be supplied temporarily through `TIMECLOCK_ADMIN_PASSWORD`.
 
-### 5. Set writable directories
+### 5. Configure the document root
 
-Ensure PHP can write to:
+Point the domain or subdomain document root to the project's `public/` directory. This is the recommended deployment arrangement because application code, configuration, database scripts, and runtime data remain outside the web root.
+
+If the entire project must be placed under a web-accessible shared-hosting directory, keep both `.htaccess` files in place and confirm that direct requests to `app/`, `database/`, `storage/`, `cron/`, and `bin/` return HTTP 403.
+
+### 6. Set writable directories
+
+PHP must be able to write to:
 
 ```text
 storage/logs/
+storage/rate-limits/
 storage/reports/
 storage/sessions/
 ```
 
-On shared hosting, directory permissions of `0775` are often appropriate, but follow the hosting provider's guidance.
+Permissions of `0775` are commonly appropriate on shared hosting, but follow the provider's guidance and avoid world-writable permissions.
 
 ## Usage
 
-- Employees sign in at `/login` and use `/timecard`.
-- Administrators use `/admin` to manage employees, review timecards, and finalize pay periods.
-- Finalized payroll reports are generated in `storage/reports/` and are intentionally excluded from Git.
+- Employees sign in and use **My Timecard**.
+- Administrators use **Time Cards** and the **Admin** menu.
+- Generated payroll PDFs are stored in `storage/reports/` and excluded from Git.
+- Application and PHP logs are stored in `storage/logs/` and excluded from Git.
 
 ## Optional cron job
 
-To create upcoming pay periods automatically, run this daily with the correct server path:
+Create upcoming pay periods automatically by running this command daily with the correct server path:
 
 ```bash
 php /full/path/to/timeclock-pro/cron/ensure_pay_period.php
 ```
 
-## Updating an existing installation
+## Updating an installation
 
-1. Back up the production files and database.
-2. Preserve the server's `app/config.php` file.
-3. Upload the updated tracked source files.
-4. Run only the new SQL files in `database/migrations/`.
-5. Verify login, time entry, totals, report generation, and email delivery.
+1. Back up the production database and files.
+2. Preserve the server-only `app/config.php`.
+3. Upload the new tracked source files.
+4. Apply only the new SQL files under `database/migrations/`.
+5. Verify login, time entry, PTO totals, report generation, and email delivery.
 
-Never overwrite production runtime data with files from GitHub.
+Never replace production runtime data with files from a source archive.
 
-## Debugging
+## Development checks
 
-For temporary server troubleshooting, create the empty file `storage/DEBUG_ON`. Delete it immediately after troubleshooting. Debug mode can also be controlled by the `app.debug` setting in the server-only `app/config.php`.
+Run the lightweight regression test with:
 
-Logs are written under `storage/logs/`. They may contain server paths or other sensitive context and must not be committed.
+```bash
+php tests/TimeServiceTest.php
+```
 
-## Security
+GitHub Actions checks every PHP file for syntax errors, runs the regression test, and confirms that known production-only files have not been committed.
 
-See [SECURITY.md](SECURITY.md) for repository and deployment safeguards.
+## Contributing
+
+Bug reports and contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request. Security vulnerabilities must be reported privately according to [SECURITY.md](SECURITY.md).
+
+## License
+
+TimeClock Pro is free software released under the [GNU General Public License version 3](LICENSE).
 

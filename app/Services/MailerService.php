@@ -6,7 +6,7 @@ namespace App\Services;
 final class MailerService {
 
   public static function sendWithAttachment(string $to, string $subject, string $body, string $filePath, string $fileName): bool {
-    if (!$to) return false;
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $to . $subject)) return false;
     $content = file_get_contents($filePath);
     if ($content === false) return false;
 

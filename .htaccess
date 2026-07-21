@@ -2,7 +2,11 @@
 # this helps keep private folders from being served.
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  RewriteRule ^(?:app|database|storage|cron|bin)(?:/|$) - [F,L,NC]
 </IfModule>
 
-# Deny direct access to app, database, and storage folders if misconfigured
-RedirectMatch 403 ^/(app|database|storage|cron)(/|$)
+<IfModule mod_authz_core.c>
+  <FilesMatch "(^\.|config\.php$|\.sql$|\.log$)">
+    Require all denied
+  </FilesMatch>
+</IfModule>

@@ -16,11 +16,11 @@ use App\Core\Csrf;
       <div class="row">
         <div>
           <label>Email</label>
-          <input class="input" type="email" name="email" required/>
+          <input class="input" type="email" name="email" autocomplete="email" maxlength="190" required/>
         </div>
         <div>
           <label>Password</label>
-          <input class="input" type="password" name="password" required/>
+          <input class="input" type="password" name="password" autocomplete="current-password" required/>
         </div>
       </div>
 
@@ -28,9 +28,7 @@ use App\Core\Csrf;
         <button class="btn" type="submit">Login</button>
       </div>
 
-      <div class="notice" style="margin-top:12px">
-        If you have not installed yet, run <span class="mono">/install</span>.
-      </div>
+      <div class="notice" style="margin-top:12px">Contact an administrator if you need an account or password reset.</div>
     </form>
   </div>
 </div>

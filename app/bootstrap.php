@@ -16,6 +16,11 @@ if (!defined('APP_DEBUG_FLAG')) define('APP_DEBUG_FLAG', APP_STORAGE . '/DEBUG_O
 if (!defined('APP_REQUEST_ID')) define('APP_REQUEST_ID', bin2hex(random_bytes(8)));
 
 @header('X-Request-Id: ' . APP_REQUEST_ID);
+@header('X-Frame-Options: SAMEORIGIN');
+@header('X-Content-Type-Options: nosniff');
+@header('Referrer-Policy: strict-origin-when-cross-origin');
+@header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+@header('Cache-Control: no-store, private');
 
 $GLOBALS['APP_DEBUG_RUNTIME'] = file_exists(APP_DEBUG_FLAG);
 
@@ -58,8 +63,10 @@ $renderErrorPage = function(string $publicMessage, ?Throwable $e = null) use ($p
   echo "<h1 style='margin:0 0 8px'>Server error</h1>";
   echo "<p style='margin:0 0 8px'>" . htmlspecialchars($publicMessage, ENT_QUOTES, 'UTF-8') . "</p>";
   echo "<p style='margin:0 0 8px'><strong>Request ID:</strong> " . htmlspecialchars($rid, ENT_QUOTES, 'UTF-8') . "</p>";
-  echo "<p style='margin:0 0 16px'><strong>Log file:</strong> " . htmlspecialchars($phpLog, ENT_QUOTES, 'UTF-8')
-     . ($logWritable ? "" : " <em>(not writable — fix permissions on storage/logs)</em>") . "</p>";
+  if ($debug) {
+    echo "<p style='margin:0 0 16px'><strong>Log file:</strong> " . htmlspecialchars($phpLog, ENT_QUOTES, 'UTF-8')
+       . ($logWritable ? "" : " <em>(not writable — fix permissions on storage/logs)</em>") . "</p>";
+  }
   echo $details;
   echo "</body></html>";
 };
@@ -149,6 +156,7 @@ session_name('TIMECLKSESSID');
 
 ini_set('session.cookie_path', $cookiePath);
 ini_set('session.cookie_httponly', '1');
+ini_set('session.use_only_cookies', '1');
 ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_samesite', 'Lax');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
