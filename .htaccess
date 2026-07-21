@@ -1,0 +1,8 @@
+# If you place this entire folder under a web-accessible directory (e.g., public_html/timeclock-pro),
+# this helps keep private folders from being served.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+</IfModule>
+
+# Deny direct access to app, database, and storage folders if misconfigured
+RedirectMatch 403 ^/(app|database|storage|cron)(/|$)

@@ -1,0 +1,30 @@
+# Local configuration and secrets
+/app/config.php
+.env
+.env.*
+!.env.example
+
+# Runtime and generated data
+/storage/DEBUG_ON
+/storage/logs/*
+!/storage/logs/.htaccess
+!/storage/logs/.gitkeep
+/storage/reports/*
+!/storage/reports/.htaccess
+!/storage/reports/.gitkeep
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+
+# Public diagnostic files and server logs
+/public/boot-test.php
+/public/diag.php
+/public/phpver.php
+/public/error_log
+*.log
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
