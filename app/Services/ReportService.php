@@ -55,6 +55,39 @@ final class ReportService {
     return number_format($minutes / 60, 2, '.', '');
   }
 
+  /**
+   * Build the daily time rows for one employee. An untouched timecard needs
+   * only a single line, but keep entered (even incomplete) punches visible.
+   *
+   * @return array{lines: array<int, string>, minutes: int}
+   */
+  public static function timeRowsForPeriod(array $entries, string $start, string $end): array {
+    $rows = [];
+    $rows[] = sprintf('%-10s  %-8s  %-8s  %6s', 'Date', 'In', 'Out', 'Hours');
+    $rows[] = sprintf('%-10s  %-8s  %-8s  %6s', str_repeat('-', 10), str_repeat('-', 8), str_repeat('-', 8), str_repeat('-', 6));
+
+    $sum = 0;
+    $hasRecordedTimes = false;
+    $d = new \DateTimeImmutable($start);
+    $endD = new \DateTimeImmutable($end);
+    while ($d <= $endD) {
+      $day = $d->format('Y-m-d');
+      $e = $entries[$day] ?? null;
+      $in = $e ? self::fmtTime($e['time_in'] ?? null) : '';
+      $out = $e ? self::fmtTime($e['time_out'] ?? null) : '';
+      if ($in !== '' || $out !== '') $hasRecordedTimes = true;
+      $dur = $e ? TimeService::durationMinutes($e['time_in'] ?? null, $e['time_out'] ?? null) : 0;
+      $sum += $dur;
+      $h = $dur ? self::hoursDecimal($dur) : '';
+      $rows[] = sprintf('%-10s  %-8s  %-8s  %6s', self::fmtDate($day), $in, $out, $h);
+      $d = $d->modify('+1 day');
+    }
+
+    return $hasRecordedTimes
+      ? ['lines' => $rows, 'minutes' => $sum]
+      : ['lines' => ['No hours'], 'minutes' => 0];
+  }
+
   private static function pdfEscape(string $s): string {
     return str_replace(['\\', '(', ')', "\r"], ['\\\\', '\(', '\)', ''], $s);
   }
@@ -175,25 +208,9 @@ final class ReportService {
       $lines[] = "Employee: " . $u['full_name'] . " <" . $u['email'] . ">";
       $lines[] = "Submitted: " . ($tc['submitted_at'] ? (string)$tc['submitted_at'] : 'No') . "   Locked: " . ($tc['locked_at'] ? (string)$tc['locked_at'] : 'No');
 
-      // Fixed-width columns for consistent alignment.
-      // Date=10 (MM/DD/YYYY), In=8 ("12:00 PM"), Out=8, Hours=6 ("100.00")
-      $lines[] = sprintf('%-10s  %-8s  %-8s  %6s', 'Date', 'In', 'Out', 'Hours');
-      $lines[] = sprintf('%-10s  %-8s  %-8s  %6s', str_repeat('-', 10), str_repeat('-', 8), str_repeat('-', 8), str_repeat('-', 6));
-
-      $sum = 0;
-      $d = new \DateTimeImmutable($start);
-      $endD = new \DateTimeImmutable($end);
-      while ($d <= $endD) {
-        $day = $d->format('Y-m-d');
-        $e = $entries[$day] ?? null;
-        $in = $e ? self::fmtTime($e['time_in']) : '';
-        $out = $e ? self::fmtTime($e['time_out']) : '';
-        $dur = $e ? \App\Services\TimeService::durationMinutes($e['time_in'], $e['time_out']) : 0;
-        $sum += $dur;
-        $h = $dur ? self::hoursDecimal($dur) : '';
-        $lines[] = sprintf('%-10s  %-8s  %-8s  %6s', self::fmtDate($day), $in, $out, $h);
-        $d = $d->modify('+1 day');
-      }
+      $timeRows = self::timeRowsForPeriod($entries, (string)$start, (string)$end);
+      foreach ($timeRows['lines'] as $line) $lines[] = $line;
+      $sum = $timeRows['minutes'];
 
       $pto = (int)($tc['pto_minutes'] ?? 0);
       $grand = $sum + $pto;

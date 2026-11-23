@@ -23,7 +23,9 @@ jobs:
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 
       - name: Run regression tests
-        run: php tests/TimeServiceTest.php
+        run: |
+          php tests/TimeServiceTest.php
+          php tests/ReportServiceTest.php
 
       - name: Check repository hygiene
         shell: bash
